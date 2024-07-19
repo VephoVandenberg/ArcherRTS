@@ -11,7 +11,6 @@ namespace Core
 	{
 		Vector3 position;
 		Vector3 velocity;
-		float closesEnemyDistance = std::numeric_limits<float>::infinity();
 
 		void move(float dt)
 		{
@@ -21,16 +20,22 @@ namespace Core
 
 	struct ModelComponent
 	{
-		float radius;
-		float height;
-		int32_t slices;
 		Color color;
 	};
+
+	struct Team1Component {};
+	struct Team2Component {};
 
 	struct UnitComponent
 	{
 		int32_t health;
-		float damagePercentage;
+		float closestEnemyDistance = std::numeric_limits<float>::infinity();
+
+		enum State 
+		{
+			MARCH,
+			ATTACK
+		} state = MARCH;
 	};
 
 	class Scene
@@ -41,20 +46,24 @@ namespace Core
 
 		void updateSystem(const float dt);
 		void renderingSystem() const;
-
 	private:
-		void spawnArmies(const float dt);
-		bool recruteUnit(std::vector<entt::entity>& team1, std::vector<entt::entity>& team2,
-			const Vector3& spawnPoint, const Vector3& offset, const Color& color);
+		enum Team
+		{
+			_1,
+			_2
+		};
+
+		void spawnSquadsSystem(const float dt);
+		bool spawnUnitSystem(Team team, const Vector3& spawnPoint, const Vector3& offset, const Vector3& velocity, const Color& color);
+		void battleSystem(const float dt);
 
 		float getDistanceBetweenUnits(const entt::entity e1, const entt::entity e2) const;
 
- 		entt::registry m_registry;
+		int32_t m_team1Counter = 0;
+		int32_t m_team2Counter = 0;
 
-		std::vector<entt::entity> m_team1;
-		std::vector<entt::entity> m_team2;
+ 		entt::registry m_registry;
 
 		float m_timer = 0.0f;
 	};
 }
-

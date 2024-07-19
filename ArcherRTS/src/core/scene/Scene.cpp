@@ -17,20 +17,69 @@ constexpr Vector3 g_unitVelocity = { 4.0f, 0.0f, 4.0f };
 void Scene::updateSystem(const float dt)
 {
 	// Spawn units
-	if (m_team1.size() < g_maxSquad || m_team2.size() < g_maxSquad)
+	if (m_team1Counter < g_maxSquad || m_team2Counter < g_maxSquad)
 	{
-		spawnArmies(dt);
+		spawnSquadsSystem(dt);
 	}
 
-
-	auto view = m_registry.view<TransformComponent>();
-	for (auto [entity, transform] : view.each())
-	{
-		transform.move(dt);
-	}
-
+	battleSystem(dt);
 }
 
+void Scene::battleSystem(const float dt)
+{
+	auto team1 = m_registry.group<Team1Component>(entt::get<TransformComponent, UnitComponent>);
+	auto team2 = m_registry.group<Team2Component>(entt::get<TransformComponent, UnitComponent>);
+
+	for (auto entity : team1)
+	{
+		auto& transform = team1.get<TransformComponent>(entity);
+		auto& unit = team1.get<UnitComponent>(entity);
+
+		if (unit.state == UnitComponent::MARCH)
+		{
+			transform.move(dt);
+			for (auto entity_ : team2)
+			{
+				auto& unit_ = m_registry.get<UnitComponent>(entity_);
+
+				if (getDistanceBetweenUnits(entity, entity_) <= g_attackDistance)
+				{
+					unit.state = UnitComponent::ATTACK;
+					unit_.state = UnitComponent::ATTACK;
+				}
+			}
+		}
+		else
+		{
+
+		}
+	}
+
+	for (auto entity : team2)
+	{
+		auto& transform = team1.get<TransformComponent>(entity);
+		auto& unit = team1.get<UnitComponent>(entity);
+
+		if (unit.state == UnitComponent::MARCH)
+		{
+			transform.move(dt);
+			for (auto entity_ : team1)
+			{
+				auto& unit_ = m_registry.get<UnitComponent>(entity_);
+
+				if (getDistanceBetweenUnits(entity, entity_) <= g_attackDistance)
+				{
+					unit.state = UnitComponent::ATTACK;
+					unit_.state = UnitComponent::ATTACK;
+				}
+			}
+		}
+		else
+		{
+
+		}
+	}
+}
 
 float Scene::getDistanceBetweenUnits(const entt::entity e1, const entt::entity e2) const
 {
@@ -40,16 +89,19 @@ float Scene::getDistanceBetweenUnits(const entt::entity e1, const entt::entity e
 	return Vector3Distance(t1.position, t2.position);
 }
 
-void Scene::spawnArmies(const float dt)
+void Scene::spawnSquadsSystem(const float dt)
 {
 	m_timer += dt;
+
+	Vector3 velocity1 = { 1, 0,	1 };
+	Vector3 velocity2 = {-1, 0,	-1 };
 
 	Vector3 offset1 = { static_cast<float>(GetRandomValue(-5, 5)), 0,	static_cast<float>(GetRandomValue(-5, 5)) };;
 	Vector3 offset2 = { static_cast<float>(GetRandomValue(-5, 5)), 0, static_cast<float>(GetRandomValue(-5, 5)) };;
 
 	bool status =
-		recruteUnit(m_team1, m_team2, g_spawnPointT1, offset1, g_colorT1) &&
-		recruteUnit(m_team2, m_team1, g_spawnPointT2, offset2, g_colorT2);
+		spawnUnitSystem(_1, g_spawnPointT1, offset1, velocity1, g_colorT1) &&
+		spawnUnitSystem(_2, g_spawnPointT2, offset2, velocity2, g_colorT2);
 
 	if (status)
 	{
@@ -57,42 +109,32 @@ void Scene::spawnArmies(const float dt)
 	}
 }
 
-bool Scene::recruteUnit(std::vector<entt::entity>& team1, std::vector<entt::entity>& enemyTeam,
-	const Vector3& spawnPoint, const Vector3& offset, const Color& color)
+bool Scene::spawnUnitSystem(Team team,
+	const Vector3& spawnPoint, const Vector3& offset, const Vector3& baseVelocity, const Color& color)
 {
-	if (team1.size() >= g_maxSquad || m_timer < g_spawnPoint)
+	int32_t& counter = team == _1 ? m_team1Counter : m_team2Counter;
+
+	if (counter >= g_maxSquad || m_timer < g_spawnPoint)
 	{
 		return false;
 	}
 
 	auto entity = m_registry.create();
 
+	m_registry.emplace<TransformComponent>(entity, Vector3Add(spawnPoint, offset), baseVelocity);
+	m_registry.emplace<ModelComponent>(entity, color);
+	m_registry.emplace<UnitComponent>(entity, 100, 0.0f, UnitComponent::MARCH);
 
-	auto& transform = m_registry.emplace<TransformComponent>(entity);
-	transform.position = Vector3Add(spawnPoint, offset);
-	transform.velocity = { 0.0f, 0.0f, 0.0f };
-
-	for (auto enemy : enemyTeam)
+	if (team == _1)
 	{
-		const auto& transform_ = m_registry.get<TransformComponent>(enemy);
-
-		float newDistance = Vector3Distance(transform_.position, spawnPoint);
-		if (newDistance < transform.closesEnemyDistance)
-		{
-			transform.closesEnemyDistance = newDistance;
-			transform.velocity = Vector3Add(
-				transform.velocity,
-				Vector3Scale(Vector3Normalize(Vector3Subtract(transform_.position, transform.position)), 3));
-		}
+		m_registry.emplace<Team1Component>(entity);
+	}
+	else
+	{
+		m_registry.emplace<Team2Component>(entity);
 	}
 
-	auto& model = m_registry.emplace<ModelComponent>(entity);
-	model.color = color;
-	model.height = g_height;
-	model.radius = g_radius;
-	model.slices = g_slices;
-
-	team1.push_back(entity);
+	counter++;
 
 	return true;
 }
@@ -105,8 +147,8 @@ void Scene::renderingSystem() const
 	{
 		DrawCylinder(
 			transform.position,
-			model.radius, model.radius,
-			model.height, model.slices,
+			g_radius, g_radius,
+			g_height, g_slices,
 			model.color);
 	}
 }
