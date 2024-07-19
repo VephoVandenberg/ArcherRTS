@@ -140,6 +140,7 @@
   <ItemGroup>
     <ClInclude Include="src\core\scene\Scene.hpp" />
     <ClInclude Include="src\core\Game.hpp" />
+    <ClInclude Include="src\core\scene\SceneConfig.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
