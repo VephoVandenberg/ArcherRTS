@@ -18,8 +18,9 @@ void Scene::updateSystem(const float dt)
 	auto projectiles = m_registry.view<ProjectileComponent, TransformComponent>();
 	for (auto [entity, transform] : projectiles.each())
 	{
+		transform.velocity.y -= 0.5f * Constants::g_gravity * dt;
 		transform.position = Vector3Add(transform.position, Vector3Scale(transform.velocity, dt));
-		transform.position.y -= 0.5f * Constants::g_gravity * dt * dt;
+		//transform.position.y -= 0.5f * Constants::g_gravity * dt * dt;
 	}
 }
 
