@@ -13,11 +13,6 @@ namespace Core
 	{
 		Vector3 position;
 		Vector3 velocity;
-
-		void move(float dt)
-		{
-			position = Vector3Add(position, Vector3Scale(velocity, dt));
-		}
 	};
 
 	struct ModelComponent
@@ -28,11 +23,16 @@ namespace Core
 	struct Team1Component {};
 	struct Team2Component {};
 
+	struct ProjectileComponent
+	{
+
+	};
+
 	struct UnitComponent
 	{
 		int32_t health;
-		float closestEnemyDistance = std::numeric_limits<float>::infinity();
-
+		Vector3 enemyPosition;
+		float attackTimer = 0.0f;
 		enum State 
 		{
 			MARCH,
@@ -49,12 +49,6 @@ namespace Core
 		void updateSystem(const float dt);
 		void renderingSystem() const;
 	private:
-		enum Team
-		{
-			_1,
-			_2
-		};
-
 		void spawnSquadsSystem(const float dt);
 		
 		template<typename T1, typename T2>
@@ -63,8 +57,8 @@ namespace Core
 		template<typename T>
 		bool spawnUnitSystem(const Vector3& spawnPoint, const Vector3& offset, const Vector3& velocity, const Color& color, int32_t& counter);
 
-
 		float getDistanceBetweenUnits(const entt::entity e1, const entt::entity e2) const;
+		Vector3 getProjectileVelocity(const entt::entity shooter) const;
 
 		int32_t m_team1Counter = 0;
 		int32_t m_team2Counter = 0;
@@ -80,45 +74,60 @@ namespace Core
 		auto team1 = m_registry.group<T1>(entt::get<TransformComponent, UnitComponent>);
 		auto team2 = m_registry.group<T2>(entt::get<TransformComponent, UnitComponent>);
 
-		for (auto entity : team1)
+		for (auto [entity, transform, unit] : team1.each())
 		{
-			auto& transform = team1.get<TransformComponent>(entity);
-			auto& unit = team1.get<UnitComponent>(entity);
-
 			if (unit.state == UnitComponent::MARCH)
 			{
-				transform.move(dt);
+				transform.position = Vector3Add(transform.position, Vector3Scale(transform.velocity, 10 * dt));
 				for (auto entity_ : team2)
 				{
 					auto& unit_ = m_registry.get<UnitComponent>(entity_);
+					auto& transform_ = m_registry.get<TransformComponent>(entity_);
 
-					if (getDistanceBetweenUnits(entity, entity_) <= Constants::g_attackDistance)
+					float distance = getDistanceBetweenUnits(entity, entity_);
+					if (distance <= Constants::g_attackDistance)
 					{
+						unit.enemyPosition = transform_.position;
 						unit.state = UnitComponent::ATTACK;
-						unit_.state = UnitComponent::ATTACK;
 					}
 				}
 			}
 			else
 			{
+				unit.attackTimer += dt;
+				if (unit.attackTimer >= Constants::g_attackTimePoint)
+				{
+					auto unitColor = m_registry.get<ModelComponent>(entity);
+					auto projectile = m_registry.create();
 
+					Vector3 velocity = getProjectileVelocity(entity);
+
+					auto transform_ = m_registry.emplace<TransformComponent>(projectile, transform.position, velocity);
+					
+					m_registry.emplace<ModelComponent>(projectile, unitColor);
+					m_registry.emplace<ProjectileComponent>(projectile);
+					unit.attackTimer = 0.0f;
+				}
 			}
 		}
 	}
 
 	template<typename T>
-	bool Scene::spawnUnitSystem(const Vector3& spawnPoint, const Vector3& offset, const Vector3& baseVelocity, const Color& color, int32_t& counter)
+	bool Scene::spawnUnitSystem(const Vector3& spawnPoint, const Vector3& offset, const Vector3& baseVelocity, 
+		const Color& color, int32_t& counter)
 	{
-		if (counter >= Constants::g_maxSquad || m_timer < Constants::g_spawnPoint)
+		if (counter >= Constants::g_maxSquad || m_timer < Constants::g_spawnTimePoint)
 		{
 			return false;
 		}
 
 		auto entity = m_registry.create();
 
-		m_registry.emplace<TransformComponent>(entity, Vector3Add(spawnPoint, offset), baseVelocity);
+		Vector3 point = Vector3Add(spawnPoint, offset);
+
+		m_registry.emplace<TransformComponent>(entity, point, baseVelocity);
 		m_registry.emplace<ModelComponent>(entity, color);
-		m_registry.emplace<UnitComponent>(entity, 100, 0.0f, UnitComponent::MARCH);
+		m_registry.emplace<UnitComponent>(entity, Constants::g_health, point, 0.0f, UnitComponent::MARCH);
 		m_registry.emplace<T>(entity);
 
 		counter++;

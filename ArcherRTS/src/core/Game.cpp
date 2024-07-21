@@ -56,11 +56,13 @@ void Game::draw() const
 
 		} EndMode3D();
 
+		DrawFPS(10, 10);
+
 	} EndDrawing();
 }
 
 void Game::drawGround() const
 {
 	DrawCube(g_groundPos, 100.0f, 1.0f, 100.0f, g_groundColor);
-	DrawCubeWires({ 50.0f, 0.0f, 50.0f }, 100.0f, 1.0f, 100.0f, MAROON);
+	DrawCubeWires(g_groundPos, 100.0f, 1.0f, 100.0f, MAROON);
 }

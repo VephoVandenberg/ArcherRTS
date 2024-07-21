@@ -1,3 +1,4 @@
-﻿  Scene.cpp
-D:\Working\ArcherRTS\ArcherRTS\src\core\scene\Scene.cpp(54,36): warning C4244: 'argument': conversion from 'const float' to 'int', possible loss of data
+﻿  Game.cpp
+  Scene.cpp
+  Generating Code...
   ArcherRTS.vcxproj -> D:\Working\ArcherRTS\x64\Debug\ArcherRTS.exe
