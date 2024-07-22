@@ -16,12 +16,36 @@ void Scene::updateSystem(const float dt)
 	battleSystem<Team2Component, Team1Component>(dt);
 
 	auto projectiles = m_registry.view<ProjectileComponent, TransformComponent>();
-	for (auto [entity, transform] : projectiles.each())
+	for (auto [entity, projectile, transform] : projectiles.each())
 	{
-		transform.velocity.y -= 0.5f * Constants::g_gravity * dt;
 		transform.position = Vector3Add(transform.position, Vector3Scale(transform.velocity, dt));
-		//transform.position.y -= 0.5f * Constants::g_gravity * dt * dt;
+		transform.velocity.y -= Constants::g_gravity * dt;
+
+		bool hit = false;
+		if (m_registry.valid(projectile.target))
+		{
+			auto& targetTransform = m_registry.get<TransformComponent>(projectile.target);
+			auto& targetUnit = m_registry.get<UnitComponent>(projectile.target);
+
+			hit = projectileInBounds(transform.position, targetTransform.box);
+			if (hit)
+			{
+				targetUnit.health -= 20;
+			}
+		}
+					
+		if (transform.position.y <= 0.0f || hit)
+		{
+			m_registry.destroy(entity);
+		}
 	}
+}
+
+bool Scene::projectileInBounds(const Vector3& projectilePos, const BoundingBox& box)
+{
+	return box.min.x <= projectilePos.x && projectilePos.x <= box.max.x && 
+		box.min.y <= projectilePos.y && projectilePos.y <= box.max.y &&
+		box.min.z <= projectilePos.z && projectilePos.z <= box.max.z;
 }
 
 float Scene::getDistanceBetweenUnits(const entt::entity e1, const entt::entity e2) const
@@ -66,7 +90,7 @@ void Scene::renderingSystem() const
 	}
 
 	auto projectiles = m_registry.view<ProjectileComponent, TransformComponent, ModelComponent>();
-	for (auto [entity, transform, model] : projectiles.each())
+	for (auto [entity, projectile, transform, model] : projectiles.each())
 	{
 		Vector3 end = Vector3Add(transform.position, Vector3Scale(Vector3Normalize(transform.velocity), 0.5f));
 
@@ -76,13 +100,13 @@ void Scene::renderingSystem() const
 
 Vector3 Scene::getProjectileVelocity(const entt::entity shooter) const
 {
-	auto unit = m_registry.get<UnitComponent>(shooter);
-	auto uTransform = m_registry.get<TransformComponent>(shooter);
+	auto& unit = m_registry.get<UnitComponent>(shooter);
+	auto& transform = m_registry.get<TransformComponent>(shooter);
 
-	float D = Vector3Distance(uTransform.position, unit.enemyPosition);
+	float D = Vector3Distance(transform.position, unit.enemyPosition);
 
-	float alpha = 0.5f * (asinf((D * Constants::g_gravity) / (Constants::g_projectileSpeed * Constants::g_projectileSpeed)) * RAD2DEG);
-	Vector3 dir = Vector3Normalize(Vector3Subtract(unit.enemyPosition, uTransform.position));
+	float alpha = 0.5f * (asinf((D * Constants::g_gravity) / (Constants::g_projectileSpeedSquared)));
+	Vector3 dir = Vector3Normalize(Vector3Subtract(unit.enemyPosition, transform.position));
 	
 	Vector3 rotationAxis = Vector3CrossProduct(dir, { 0, 1, 0 });
 	dir = Vector3RotateByAxisAngle(dir, rotationAxis, alpha);

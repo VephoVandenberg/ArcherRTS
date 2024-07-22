@@ -13,6 +13,7 @@ namespace Core
 	{
 		Vector3 position;
 		Vector3 velocity;
+		BoundingBox box;
 	};
 
 	struct ModelComponent
@@ -25,15 +26,21 @@ namespace Core
 
 	struct ProjectileComponent
 	{
+		entt::entity target;
+	};
 
+	struct EnemyComponent
+	{
+		entt::entity enemy;
 	};
 
 	struct UnitComponent
 	{
 		int32_t health;
 		Vector3 enemyPosition;
+		float enemyDistance;
 		float attackTimer = 0.0f;
-		enum State 
+		enum State
 		{
 			MARCH,
 			ATTACK
@@ -50,7 +57,7 @@ namespace Core
 		void renderingSystem() const;
 	private:
 		void spawnSquadsSystem(const float dt);
-		
+
 		template<typename T1, typename T2>
 		void battleSystem(const float dt);
 
@@ -59,11 +66,12 @@ namespace Core
 
 		float getDistanceBetweenUnits(const entt::entity e1, const entt::entity e2) const;
 		Vector3 getProjectileVelocity(const entt::entity shooter) const;
+		bool projectileInBounds(const Vector3& projectilePos, const BoundingBox& box);
 
 		int32_t m_team1Counter = 0;
 		int32_t m_team2Counter = 0;
 
- 		entt::registry m_registry;
+		entt::registry m_registry;
 
 		float m_timer = 0.0f;
 	};
@@ -76,9 +84,18 @@ namespace Core
 
 		for (auto [entity, transform, unit] : team1.each())
 		{
+			if (unit.health <= 0.0f)
+			{
+				m_registry.destroy(entity);
+				continue;
+			}
+
 			if (unit.state == UnitComponent::MARCH)
 			{
 				transform.position = Vector3Add(transform.position, Vector3Scale(transform.velocity, 10 * dt));
+				transform.box.min = Vector3Add(transform.box.min, Vector3Scale(transform.velocity, 10 * dt));
+				transform.box.max = Vector3Add(transform.box.max, Vector3Scale(transform.velocity, 10 * dt));
+
 				for (auto entity_ : team2)
 				{
 					auto& unit_ = m_registry.get<UnitComponent>(entity_);
@@ -89,23 +106,43 @@ namespace Core
 					{
 						unit.enemyPosition = transform_.position;
 						unit.state = UnitComponent::ATTACK;
+
+						m_registry.emplace<EnemyComponent>(entity, entity_);
+					
+						break;
+					}
+					else if (distance < unit.enemyDistance)
+					{
+						unit.enemyDistance = distance;
+						transform.velocity = 
+							Vector3Scale(Vector3Normalize(Vector3Subtract(transform_.position, transform.position)), Constants::g_unitSpeed);
 					}
 				}
 			}
 			else
 			{
+				auto& eComp = m_registry.get<EnemyComponent>(entity);
+				if (!m_registry.valid(eComp.enemy))
+				{
+					m_registry.erase<EnemyComponent>(entity);
+					unit.state = UnitComponent::MARCH;
+					unit.attackTimer = 0.0f;
+					continue;
+				}
+
 				unit.attackTimer += dt;
 				if (unit.attackTimer >= Constants::g_attackTimePoint)
 				{
-					auto unitColor = m_registry.get<ModelComponent>(entity);
 					auto projectile = m_registry.create();
+
+					auto& unitColor = m_registry.get<ModelComponent>(entity); 
 
 					Vector3 velocity = getProjectileVelocity(entity);
 
-					auto transform_ = m_registry.emplace<TransformComponent>(projectile, transform.position, velocity);
-					
 					m_registry.emplace<ModelComponent>(projectile, unitColor);
-					m_registry.emplace<ProjectileComponent>(projectile);
+					m_registry.emplace<TransformComponent>(projectile, transform.position, velocity);
+					m_registry.emplace<ProjectileComponent>(projectile, m_registry.get<EnemyComponent>(entity).enemy);
+					
 					unit.attackTimer = 0.0f;
 				}
 			}
@@ -113,7 +150,7 @@ namespace Core
 	}
 
 	template<typename T>
-	bool Scene::spawnUnitSystem(const Vector3& spawnPoint, const Vector3& offset, const Vector3& baseVelocity, 
+	bool Scene::spawnUnitSystem(const Vector3& spawnPoint, const Vector3& offset, const Vector3& baseVelocity,
 		const Color& color, int32_t& counter)
 	{
 		if (counter >= Constants::g_maxSquad || m_timer < Constants::g_spawnTimePoint)
@@ -125,9 +162,14 @@ namespace Core
 
 		Vector3 point = Vector3Add(spawnPoint, offset);
 
-		m_registry.emplace<TransformComponent>(entity, point, baseVelocity);
+		BoundingBox box = {
+			Vector3Subtract(point, {Constants::g_radius, Constants::g_height * 0.5f, Constants::g_radius}),
+			Vector3Add(point, {Constants::g_radius, Constants::g_height * 0.5f, Constants::g_radius})
+		};
+
+		m_registry.emplace<TransformComponent>(entity, point, baseVelocity, box);
 		m_registry.emplace<ModelComponent>(entity, color);
-		m_registry.emplace<UnitComponent>(entity, Constants::g_health, point, 0.0f, UnitComponent::MARCH);
+		m_registry.emplace<UnitComponent>(entity, Constants::g_health, point, std::numeric_limits<float>::infinity(), 0.0f, UnitComponent::MARCH);
 		m_registry.emplace<T>(entity);
 
 		counter++;
