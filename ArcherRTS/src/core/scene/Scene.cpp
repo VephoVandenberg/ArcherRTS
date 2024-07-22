@@ -11,32 +11,34 @@ void Scene::updateSystem(const float dt)
 	{
 		spawnSquadsSystem(dt);
 	}
-
-	battleSystem<Team1Component, Team2Component>(dt);
-	battleSystem<Team2Component, Team1Component>(dt);
-
-	auto projectiles = m_registry.view<ProjectileComponent, TransformComponent>();
-	for (auto [entity, projectile, transform] : projectiles.each())
+	else
 	{
-		transform.position = Vector3Add(transform.position, Vector3Scale(transform.velocity, dt));
-		transform.velocity.y -= Constants::g_gravity * dt;
+		battleSystem<Team1Component, Team2Component>(dt);
+		battleSystem<Team2Component, Team1Component>(dt);
 
-		bool hit = false;
-		if (m_registry.valid(projectile.target))
+		auto projectiles = m_registry.view<ProjectileComponent, TransformComponent>();
+		for (auto [entity, projectile, transform] : projectiles.each())
 		{
-			auto& targetTransform = m_registry.get<TransformComponent>(projectile.target);
-			auto& targetUnit = m_registry.get<UnitComponent>(projectile.target);
+			transform.position = Vector3Add(transform.position, Vector3Scale(transform.velocity, dt));
+			transform.velocity.y -= Constants::g_gravity * dt;
 
-			hit = projectileInBounds(transform.position, targetTransform.box);
-			if (hit)
+			bool hit = false;
+			if (m_registry.valid(projectile.target))
 			{
-				targetUnit.health -= 20;
+				auto& targetTransform = m_registry.get<TransformComponent>(projectile.target);
+				auto& targetUnit = m_registry.get<UnitComponent>(projectile.target);
+
+				hit = projectileInBounds(transform.position, targetTransform.box);
+				if (hit)
+				{
+					targetUnit.health -= Constants::g_damage;
+				}
 			}
-		}
-					
-		if (transform.position.y <= 0.0f || hit)
-		{
-			m_registry.destroy(entity);
+
+			if (transform.position.y <= 0.0f || hit)
+			{
+				m_registry.destroy(entity);
+			}
 		}
 	}
 }

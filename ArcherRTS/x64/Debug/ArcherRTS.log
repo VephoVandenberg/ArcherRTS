@@ -1,2 +1,2 @@
-﻿  Scene.cpp
+﻿LINK : warning LNK4098: defaultlib 'MSVCRT' conflicts with use of other libs; use /NODEFAULTLIB:library
   ArcherRTS.vcxproj -> D:\Working\ArcherRTS\x64\Debug\ArcherRTS.exe

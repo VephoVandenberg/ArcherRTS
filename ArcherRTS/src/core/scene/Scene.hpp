@@ -95,6 +95,7 @@ namespace Core
 				transform.position = Vector3Add(transform.position, Vector3Scale(transform.velocity, 10 * dt));
 				transform.box.min = Vector3Add(transform.box.min, Vector3Scale(transform.velocity, 10 * dt));
 				transform.box.max = Vector3Add(transform.box.max, Vector3Scale(transform.velocity, 10 * dt));
+				
 
 				for (auto entity_ : team2)
 				{
@@ -106,16 +107,23 @@ namespace Core
 					{
 						unit.enemyPosition = transform_.position;
 						unit.state = UnitComponent::ATTACK;
+						unit.enemyDistance = distance;
 
-						m_registry.emplace<EnemyComponent>(entity, entity_);
-					
-						break;
+						if (m_registry.all_of<EnemyComponent>(entity))
+						{
+							auto& enemyComp = m_registry.get<EnemyComponent>(entity);
+							enemyComp.enemy = entity_;
+						}
+						else
+						{
+							m_registry.emplace<EnemyComponent>(entity, entity_);
+						}
 					}
 					else if (distance < unit.enemyDistance)
 					{
 						unit.enemyDistance = distance;
 						transform.velocity = 
-							Vector3Scale(Vector3Normalize(Vector3Subtract(transform_.position, transform.position)), Constants::g_unitSpeed);
+							Vector3Scale(Vector3Normalize(Vector3Subtract(transform_.position, transform.position)), 0.5f);
 					}
 				}
 			}

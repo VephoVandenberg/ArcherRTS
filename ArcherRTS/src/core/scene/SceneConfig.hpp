@@ -11,6 +11,7 @@ namespace Constants
 	constexpr float g_projectileSpeedSquared = 1600.0f;
 	constexpr float g_unitSpeed = 2.0f;
 	constexpr int32_t g_slices = 5;
+	constexpr int32_t g_damage = 20;
 	constexpr int32_t g_health = 100;
 	constexpr int32_t g_maxSquad = 20;
 	constexpr int32_t g_attackDistance = 40;
